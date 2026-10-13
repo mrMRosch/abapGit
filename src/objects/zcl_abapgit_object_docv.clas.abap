@@ -25,6 +25,7 @@ CLASS zcl_abapgit_object_docv DEFINITION
         doctitle TYPE dsyst-doktitle,
         head     TYPE thead,
         lines    TYPE tline_tab,
+        version  TYPE dokhl-dokversion,
       END OF ty_data.
 
     CONSTANTS c_typ TYPE dokhl-typ VALUE 'E' ##NO_TEXT.
@@ -37,6 +38,10 @@ CLASS zcl_abapgit_object_docv DEFINITION
     METHODS read
       RETURNING
         VALUE(rs_data) TYPE ty_data.
+
+    METHODS get_version
+      RETURNING
+        VALUE(rv_version) TYPE dokhl-dokversion.
 ENDCLASS.
 
 
@@ -79,7 +84,26 @@ CLASS zcl_abapgit_object_docv IMPLEMENTATION.
   ENDMETHOD.
 
 
+  METHOD get_version.
+    DATA lv_found TYPE i.
+    DATA lv_dokil TYPE dokil.
+
+    CALL FUNCTION 'DOCU_INIT'
+      EXPORTING id     = mv_id
+                langu  = mv_language
+                object = mv_doc_object
+                typ    = c_typ
+      IMPORTING found  = lv_found
+                xdokil = lv_dokil.
+    IF lv_found <> 0.
+      rv_version = c_version.
+    ELSE.
+      rv_version = lv_dokil-version.
+    ENDIF.
+  ENDMETHOD.
+
   METHOD read.
+    rs_data-version = get_version( ).
 
     CALL FUNCTION 'DOCU_READ'
       EXPORTING
@@ -87,7 +111,7 @@ CLASS zcl_abapgit_object_docv IMPLEMENTATION.
         langu    = mv_language
         object   = mv_doc_object
         typ      = c_typ
-        version  = c_version
+        version  = rs_data-version
       IMPORTING
         doktitle = rs_data-doctitle
         head     = rs_data-head
@@ -133,12 +157,16 @@ CLASS zcl_abapgit_object_docv IMPLEMENTATION.
     io_xml->read( EXPORTING iv_name = c_name
                   CHANGING cg_data = ls_data ).
 
+    IF ls_data-version IS INITIAL.
+      ls_data-version = get_version( ).
+    ENDIF.
+
     CALL FUNCTION 'DOCU_UPDATE'
       EXPORTING
         head    = ls_data-head
         state   = 'A'
         typ     = c_typ
-        version = c_version
+        version = ls_data-version
       TABLES
         line    = ls_data-lines.
 
